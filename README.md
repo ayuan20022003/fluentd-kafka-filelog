@@ -1,2 +1,120 @@
 # fluentd-kafka-filelog
-Fluentd收集openshift应用程序的文件日志
+Fluentd收集openshift应用程序的文件日志到kafka集群
+
+
+## 使用带logging-agent的sidecar容器收集日志
+
+![](./img/logging-with-sidecar-agent.png)
+
+
+openshift deploymentconfig 示例
+
+[filelogexam.yaml](./example/filelogexam.yaml)
+
+```
+apiVersion: apps.openshift.io/v1
+kind: DeploymentConfig
+metadata:
+  annotations:
+  labels:
+    app: filelogexam
+  name: filelogexam
+  namespace: logging
+spec:
+  replicas: 1
+  selector:
+    app: filelogexam
+    deploymentconfig: filelogexam
+  strategy:
+    activeDeadlineSeconds: 21600
+    resources: {}
+    rollingParams:
+      intervalSeconds: 1
+      maxSurge: 25%
+      maxUnavailable: 25%
+      timeoutSeconds: 600
+      updatePeriodSeconds: 1
+    type: Rolling
+  template:
+    metadata:
+      annotations:
+      labels:
+        app: filelogexam
+        deploymentconfig: filelogexam
+    spec:
+      containers:
+      - name: count
+        image: offlineregistry.dataman-inc.com:5000/library/busybox:1.29.3
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 500m
+            memory: 512Mi
+        args:
+        - /bin/sh
+        - -c
+        - >
+          i=0;
+          while true;
+          do
+            mkdir -p /var/log/filelog/aaa;
+            echo "$i: $(date)" >> /var/log/filelog/aaa/1.log;
+            echo "$(date) INFO $i" >> /var/log/filelog/aaa/2.log;
+            i=$((i+1));
+            sleep 1;
+          done
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+      - name: logging-agent
+        image: offlineregistry.dataman-inc.com:5000/fluentd/fluentd-kubernetes-daemonset:v0.12-alpine-kafka-filelog-3
+        resources:
+          limits:
+            cpu: 500m
+            memory: 512Mi
+          requests:
+            cpu: 500m
+            memory: 512Mi
+        env:
+        - name: FLUENTD_CONF
+          value: fluent.conf
+        - name: FLUENTD_LOG_PATH
+          value: "/var/log/filelog/*/*.log"
+        - name: FLUENT_KAFKA_BROKERS
+          value: '192.168.1.212:9092'
+        - name: FLUENT_KAFKA_DEFAULT_TOPIC
+          value: filelog
+        - name: FLUENT_KAFKA_COMPRESSION_CODEC
+          value: gzip
+        - name: FLUENT_KAFKA_MAX_SEND_LIMIT_BYTES
+          value: '1000000'
+        - name: NODE_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: spec.nodeName
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.name
+        - name: NAMESPACE
+          valueFrom:
+            fieldRef:
+              fieldPath: metadata.namespace
+        - name: POD_IP
+          valueFrom:
+            fieldRef:
+              fieldPath: status.podIP
+        volumeMounts:
+        - name: varlog
+          mountPath: /var/log
+      volumes:
+      - name: varlog
+        emptyDir: {}
+      dnsPolicy: ClusterFirst
+      restartPolicy: Always
+      schedulerName: default-scheduler
+      securityContext: {}
+      terminationGracePeriodSeconds: 30
+```
