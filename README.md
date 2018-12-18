@@ -1,2 +1,2 @@
 # fluentd-kafka-filelog
-Fluentd收集kubenates应用程序的文件日志
+Fluentd收集openshift应用程序的文件日志
