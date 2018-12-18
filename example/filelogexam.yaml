@@ -30,7 +30,7 @@ spec:
     spec:
       containers:
       - name: count
-        image: offlineregistry.dataman-inc.com:5000/library/busybox:1.29.3
+        image: busybox:1.29.3
         resources:
           limits:
             cpu: 500m
@@ -55,7 +55,7 @@ spec:
         - name: varlog
           mountPath: /var/log
       - name: logging-agent
-        image: offlineregistry.dataman-inc.com:5000/fluentd/fluentd-kubernetes-daemonset:v0.12-alpine-kafka-filelog-3
+        image: demoregistry.dataman-inc.com:5000/fluentd/fluentd-kubernetes-daemonset:v0.12-alpine-kafka-filelog-3
         resources:
           limits:
             cpu: 500m
